@@ -1,0 +1,484 @@
+---
+title: "project_2 update"
+author: "shantanu solanki"
+date: "July 10, 2021"
+output:
+  word_document: default
+  html_document: default
+editor_options:
+  chunk_output_type: inline
+---
+```{r opts, echo = FALSE}
+knitr::opts_chunk$set(
+  fig.path = "Visualisation-Graph/"
+)
+```
+
+```{r libraries}
+install.packages("gplots")
+install.packages("highcharter")
+library(highcharter)
+library(ggplot2)
+library(gplots)
+```
+
+```{r sumary}
+#Read Data
+BankChurners <- read.csv("BankChurners.csv")
+
+#Convert to Data.Frame
+BankChurn.df <- data.frame(BankChurners[-c(1,22,23)])
+
+#Check for missing values
+MissingData <- is.null(BankChurn.df)
+
+#Convert Variables from character to numeric
+BankChurn.df$Attrition_Flag <- ifelse(BankChurn.df$Attrition_Flag == "Existing Customer", 1, 0)
+BankChurn.df$Gender <- ifelse(BankChurn.df$Gender == "M", 1, 0)
+BankChurn.df$Education_Level <- as.numeric(factor(BankChurn.df$Education_Level,levels = unique(BankChurn.df$Education_Level)))
+BankChurn.df$Marital_Status <- as.numeric(factor(BankChurn.df$Marital_Status,levels = unique(BankChurn.df$Marital_Status)))
+BankChurn.df$Card_Category <- as.numeric(factor(BankChurn.df$Card_Category, levels = unique(BankChurn.df$Card_Category)))
+BankChurn.df$Income_Category <- as.numeric(factor(BankChurn.df$Income_Category, levels = unique(BankChurn.df$Income_Category)))
+
+#summary
+summary.data.frame(BankChurn.df)
+
+#Correlation and Heat Map
+BankChurn.df.cor <- cor(BankChurn.df); BankChurn.df.cor
+
+heatmap.2(BankChurn.df.cor,main = "BankChurn Correlation Heatmap", Rowv = FALSE, Colv = FALSE,
+          dendrogram ="none",cellnote = round(BankChurn.df.cor,2),
+          notecol = "black", key = FALSE, trace = 'none', margins = c(10,10))
+
+#visual of Highest Correlation
+ggplot(BankChurn.df, aes(x=Total_Trans_Amt, y=Total_Trans_Ct)) + 
+  geom_point()+
+  geom_smooth(method=lm)+
+  ggtitle("Total Trans Amt vs Total Trans Ct")
+
+ggplot(BankChurn.df, aes(x=Customer_Age, y=Months_on_book)) + 
+  geom_point()+
+  geom_smooth(method=lm)+
+  ggtitle("Customer Age vs Months on Book")
+
+#visual of Attrition vs Total Trans Ct
+ggplot(BankChurn.df, aes(x=Total_Trans_Ct, y=Attrition_Flag)) + 
+  geom_point()+
+  geom_smooth(method=lm)+
+  ggtitle("Attrition vs Total Trans Ct")
+#visual All Data
+```
+
+
+
+
+```{r EDA}
+##EDA of bank churn data set
+churn.df <- read.csv("BankChurners.csv")
+str(churn.df)
+head(churn.df)
+
+library(ggplot2)
+#Drop variable from dataset
+churn.df <- churn.df[1:(length(churn.df)-2)]
+```
+
+
+```{r missing value}
+#Check for missing values
+MissingData <- is.null(churn.df)
+MissingData
+```
+
+```{r Summary of dataset}
+#structure of dataset
+str(churn.df)
+class(churn.df)
+summary(churn.df)
+```
+
+
+```{r Distribution - Customer Age}
+#distribution of customer_Age
+hist(churn.df$Customer_Age)
+
+# 2nd way of Histogram
+ggplot(churn.df) +
+  geom_histogram(aes(x = Customer_Age, color = Attrition_Flag), binwidth = 6, fill = "goldenrod2") +
+  ggtitle("Histogram of Customer_Age")
+# Customer age is normally distributed
+
+#Boxplot of customer_Age
+boxplot(churn.df[,"Customer_Age"])
+
+boxplot(churn.df$Customer_Age,col="purple",horizontal = T,
+        xlab="Customer's Age",ylab="Age counts",main="Age distribution")
+
+
+#Effect of Customer age on customer churn
+  ggplot(churn.df) +
+  geom_histogram(aes(x = Customer_Age, color = Attrition_Flag), binwidth =5 , fill = "goldenrod2") +
+  ggtitle("Customer age Effect on the Credit Card ")
+
+```
+                  
+  
+  
+```{r Distribution - Attrition Flag}
+
+#Distribution of Attrition_Flag
+
+churn.df$Attrition_Flag<- as.factor(churn.df$Attrition_Flag)
+class(churn.df$Attrition_Flag)
+levels(churn.df$Attrition_Flag)
+plot(churn.df$Attrition_Flag,col="purple",ylab="Count",
+     ylim=c(0,8000),main="Attrition Flag distribution")
+```
+
+```{r Distribution - Gender}
+
+#Distribution of Gender
+plot(as.factor(churn.df$Gender),col="purple",ylab="Count",
+     main="Customer Gender Distribution")
+
+#piechart
+ggplot(churn.df, aes(x="", y=Gender, fill=Gender)) +
+  geom_bar(stat="identity", width=1) +
+  coord_polar("y", start=0)
+
+#Effect of Gender on customer churn
+ggplot(churn.df) +
+  geom_bar( aes(x =  Gender, color = Attrition_Flag, fill = Attrition_Flag) )
+  scale_x_discrete(limits = levels(churn.df$ Gender),
+                   labels = unique(churn.df$ Gender))
+```
+
+```{r Distribution - Dependent_Count}
+#Distribution of Dependent_Count
+ggplot(churn.df) +
+  geom_histogram(aes(x = Dependent_count), binwidth = 1, fill = "goldenrod2") +
+  ggtitle("Histogram of Dependent_count")
+
+#Dependent is almost normally distributed
+
+#Boxplot of Dependent_Count
+boxplot(churn.df[,"Dependent_count"])
+
+boxplot(churn.df$Dependent_count,col="purple",horizontal = T,
+        xlab="Dependent_count",ylab="counts",main="Dependent Count distribution")
+
+#Effect of Dependent count on customer churn
+ggplot(churn.df) +
+  geom_bar( aes(x =  Dependent_count, color = Attrition_Flag, fill = Attrition_Flag) )
+  scale_x_discrete(limits = levels(churn.df$ Dependent_count),
+                   labels = unique(churn.df$ Dependent_count))
+```
+
+
+
+```{r Education distribution}
+#Distribution of Education_Level
+ggplot(churn.df, aes(x = Education_Level)) +
+  geom_bar(fill = "steelblue") +
+  scale_x_discrete(limits = levels(churn.df$Education_Level),
+                   labels = unique(churn.df$Education_Level))
+ #Relation b/w Attrition_Flag and Education_Level}
+ggplot(churn.df) +
+  geom_bar( aes(x = Education_Level, color = Attrition_Flag, fill = Attrition_Flag) )
+  scale_x_discrete(limits = levels(churn.df$Education_Level),
+                   labels = unique(churn.df$Education_Level))
+```        
+
+It appears that the churn ratio is a little higher for the Graduate customers but not significant. Therefore, it can be concluded that the Education level of customer is not an important factor in determining customer churn. 
+
+
+```{r Marital_Status Distribution}
+#piechart
+ggplot(churn.df, aes(x="", y=Marital_Status, fill=Marital_Status)) +
+  geom_bar(stat="identity", width=1) +
+  coord_polar("y", start=0)
+
+#Effect of Marital_status on Customer Churn
+ggplot(churn.df) +
+  geom_bar( aes(x = Marital_Status, color = Attrition_Flag, fill = Attrition_Flag) )
+  scale_x_discrete(limits = levels(churn.df$Marital_Status),
+                   labels = unique(churn.df$Marital_Status))
+```
+
+
+
+```{r Income_Category Distribution}
+#Histogram
+ggplot(churn.df, aes(x = Income_Category)) +
+  geom_bar(fill = "steelblue") +
+  scale_x_discrete(limits = levels(churn.df$Income_Category),
+   labels = unique(churn.df$Income_Category))
+
+#Effect of Income category on customer churn
+ggplot(churn.df) +
+  geom_bar( aes(x = Income_Category, color = Attrition_Flag, fill = Attrition_Flag) )
+  scale_x_discrete(limits = levels(churn.df$Income_Category),
+                   labels = unique(churn.df$Income_Category))
+```
+
+
+```{r Card_Category Distribution}
+#Histogram
+ggplot(churn.df, aes(x = Card_Category)) +
+  geom_bar(fill = "steelblue") +
+  scale_x_discrete(limits = levels(churn.df$Card_Category),
+   labels = unique(churn.df$Card_Category))
+
+#Effect of card category on customer churn
+ggplot(churn.df) +
+  geom_bar( aes(x = Card_Category, color = Attrition_Flag, fill = Attrition_Flag) )
+  scale_x_discrete(limits = levels(churn.df$Card_Category),
+                   labels = unique(churn.df$Card_Category))
+```  
+  
+  
+```{r Distribution Of Period of relationship with bank} 
+#Histogram
+ggplot(churn.df) +
+  geom_histogram(aes(x = Months_on_book), binwidth = 6, fill = "goldenrod2") +
+  ggtitle("Histogram of Months_on_book")
+
+#Outliers
+#Box plot for outliers
+ggplot(churn.df) +
+  geom_boxplot(aes(x = "Months_on_book", y = Months_on_book), 
+               fill = "gold1", outlier.color = "firebrick2") +
+  xlab("Months on Book boxplot") + ggtitle("Distribution of Months_on_book variable")
+
+#Effect of Period of relationship with bank on customer churn
+ggplot(churn.df) +
+  geom_bar( aes(x = Months_on_book, color = Attrition_Flag, fill = Attrition_Flag) )
+  scale_x_discrete(limits = levels(churn.df$Months_on_book),
+                   labels = unique(churn.df$Months_on_book))
+  
+```
+ 
+```{r Disribution of Total no. of products held by the customer}
+#Histogram
+ggplot(churn.df) +
+  geom_histogram(aes(x = Total_Relationship_Count), binwidth = 0.5, fill = "goldenrod2") +
+  ggtitle("Total no. of products held by the customer")
+
+#Outliers
+#Box plot for outliers
+ggplot(churn.df) +
+  geom_boxplot(aes(x = "Total_Relationship_Count", y = Total_Relationship_Count), 
+               fill = "gold1", outlier.color = "firebrick2") +
+  xlab("Total_Relationship_count boxplot") + ggtitle("Distribution of total no. of product held by customer variable")
+
+#Effect of Total no. of product held by customer on Customer churn
+ggplot(churn.df) +
+  geom_bar( aes(x = Total_Relationship_Count, color = Attrition_Flag, fill = Attrition_Flag) )
+  scale_x_discrete(limits = levels(churn.df$Total_Relationship_Count),
+                   labels = unique(churn.df$Total_Relationship_Count))
+```
+
+
+```{r Distribution of No. of months inactive in the last 12 months}
+#Histogram
+ggplot(churn.df) +
+  geom_histogram(aes(x = Months_Inactive_12_mon), binwidth = 0.5, fill = "goldenrod2") +
+  ggtitle("No. of months inactive in the last 12 months")
+
+#Outliers
+#Box plot for outliers
+ggplot(churn.df) +
+  geom_boxplot(aes(x = "Months_Inactive_12_mon", y = Months_Inactive_12_mon), 
+               fill = "gold1", outlier.color = "firebrick2") +
+  xlab("Months_Inactive_12_mon boxplot") + ggtitle("Distribution of no. of months inactive in the last 12 months")
+
+#Effect of No. of months inactive in the last 12 months on Customer churn
+ggplot(churn.df) +
+  geom_bar( aes(x = Months_Inactive_12_mon, color = Attrition_Flag, fill = Attrition_Flag) )
+  scale_x_discrete(limits = levels(churn.df$Months_Inactive_12_mon),
+                   labels = unique(churn.df$Months_Inactive_12_mon))
+```                   
+
+
+
+```{r Distribution of No. of Contacts in the last 12 months}
+#Histogram
+ggplot(churn.df) +
+  geom_histogram(aes(x =Contacts_Count_12_mon), binwidth = 0.5, fill = "goldenrod2") +
+  ggtitle("No. of Contacts in the last 12 months")
+
+#Outliers
+#Box plot for outliers
+ggplot(churn.df) +
+  geom_boxplot(aes(x = "Contacts_Count_12_mon", y = Contacts_Count_12_mon), 
+               fill = "gold1", outlier.color = "firebrick2") +
+  xlab("Contacts_Count_12_mon boxplot") + ggtitle("Distribution of no. of contacts in the last 12 months")
+
+#Effect of No. of contacts in the last 12 months on customer churn
+ggplot(churn.df) +
+  geom_bar( aes(x = Contacts_Count_12_mon, color = Attrition_Flag, fill = Attrition_Flag) )
+  scale_x_discrete(limits = levels(churn.df$Contacts_Count_12_mon),
+                   labels = unique(churn.df$Contacts_Count_12_mon))
+```                   
+
+
+
+```{r Distribution of Credit_Limit}
+
+#Histogram
+hist(churn.df$Credit_Limit,xlab = "Credit_Limit", freq = T,
+     ylab = "count",main = "Credit limit Histogram",
+     col = "purple")
+
+#Outliers
+#Box plot for outliers
+ggplot(churn.df) +
+  geom_boxplot(aes(x = "Credit_Limit", y = Credit_Limit), 
+               fill = "gold1", outlier.color = "firebrick2") +
+  xlab(" Credit_Limit boxplot") + ggtitle("Distribution of credit limit variable")
+
+#Effect of credit limit on customer churn
+ggplot(churn.df) +
+  geom_histogram(aes(x = Credit_Limit, color = Attrition_Flag), binwidth = 5000, fill = "goldenrod2") +
+  ggtitle("Credit Limit on the Credit Card ")
+```
+
+
+```{r Distribution of Total_Revolving_Bal}
+#Histogram
+hist(churn.df$Total_Revolving_Bal,xlab = "Total_Revolving_Bal", freq = T,
+     ylab = "count",main = "Total revolving balance Histogram",
+     col = "purple") 
+#Histogram
+#Outliers
+#Box plot for outliers
+ggplot(churn.df) +
+  geom_boxplot(aes(x = "Total_Revolving_Bal", y = Total_Revolving_Bal), 
+               fill = "gold1", outlier.color = "firebrick2") +
+  xlab(" Total_Revolving_Bal boxplot") + ggtitle("Distribution of Total Revolving balance variable ")
+
+#Effect of total revolving balance on customer churn
+ggplot(churn.df) +
+  geom_histogram(aes(x = Total_Revolving_Bal, color = Attrition_Flag), binwidth =500 , fill = "goldenrod2") +
+  ggtitle("Total Revolving Balance on the Credit Card ")
+```
+
+
+
+```{r Distribution of Change in Transaction Amount(Q4 over Q1)}
+#Histogram
+hist(churn.df$Total_Amt_Chng_Q4_Q1,xlab = "Total_Amt_Chng_Q4_Q1", freq = T,
+     ylab = "count",main = "Change in Transaction Amount (Q4 over Q1) Histogram",
+     col = "purple") 
+
+#Outliers
+#Box plot for outliers
+ggplot(churn.df) +
+  geom_boxplot(aes(x = "Total_Amt_Chng_Q4_Q1", y = Total_Amt_Chng_Q4_Q1), 
+               fill = "gold1", outlier.color = "firebrick2") +
+  xlab(" Total_Amt_Chng_Q4_Q1 boxplot") + ggtitle("Distibution of change in transaction amount variable")
+
+#Effect of change in transaction amount on Customer churn
+ggplot(churn.df) +
+  geom_histogram(aes(x = Total_Amt_Chng_Q4_Q1, color = Attrition_Flag), binwidth = 0.1, fill = "goldenrod2") +
+  ggtitle("Distribution of Change in Transaction Amount ")
+```  
+
+
+```{r Distribution of Total Transaction Amount }
+#Histogram
+hist(churn.df$Total_Trans_Amt,xlab = "Total_Trans_Amt", freq = T,
+     ylab = "count",main = "Total Transaction Count (Last 12 months) Histogram",
+     col = "purple") 
+
+#Outliers
+#Box plot for outliers
+ggplot(churn.df) +
+  geom_boxplot(aes(x = "Total_Trans_Amt", y = Total_Trans_Amt), 
+               fill = "gold1", outlier.color = "firebrick2") +
+  xlab(" Total_Trans_Amt") + ggtitle("Disribution of Total Transaction Amount variable")
+
+#Effect of Total transaction Amount on Customer churn
+ggplot(churn.df) +
+  geom_histogram(aes(x = Total_Trans_Amt, color = Attrition_Flag), binwidth = 5000, fill = "goldenrod2") +
+  ggtitle("Distribution of Total Transaction Amount ")
+```  
+
+
+```{r Distribution of Total Transaction Count}
+#Histogram
+hist(churn.df$Total_Trans_Ct,xlab = "Total_Trans_Ct", freq = T,
+     ylab = "count",main = "Total Transaction Count (Last 12 months) Histogram",
+     col = "purple") 
+
+#Outliers
+#Box plot for outliers
+ggplot(churn.df) +
+  geom_boxplot(aes(x = "Total_Trans_Ct", y = Total_Trans_Ct), 
+               fill = "gold1", outlier.color = "firebrick2") +
+  xlab(" Total_Trans_Ct") + ggtitle("Distribution of Total Transaction Count variable")
+
+#Effect of Total Transaction Count on Customer churn
+ggplot(churn.df) +
+  geom_histogram(aes(x = Total_Trans_Ct, color = Attrition_Flag), binwidth = 5, fill = "goldenrod2") +
+  ggtitle("Distribution of Total Transaction Count")
+```                   
+
+
+
+```{r Distribution of Change in Transaction Count} 
+#Histogram
+hist(churn.df$Total_Ct_Chng_Q4_Q1,xlab = "Total_Ct_Chng_Q4_Q1", freq = T,
+     ylab = "count",main = "Change in Transaction Count (Q4 over Q1) Histogram",
+     col = "blue") 
+
+#Outliers
+#Box plot for outliers
+ggplot(churn.df) +
+  geom_boxplot(aes(x = "Total_Ct_Chng_Q4_Q1", y = Total_Ct_Chng_Q4_Q1), 
+               fill = "gold1", outlier.color = "firebrick2") +
+  xlab(" Total_Ct_Chng_Q4_Q1") + ggtitle("Distribution of change in Transaction count variable")
+
+#Effect of Change in Transaction count on Customer churn
+ggplot(churn.df) +
+  geom_histogram(aes(x = Total_Ct_Chng_Q4_Q1, color = Attrition_Flag), binwidth = 0.08, fill = "goldenrod2") +
+  ggtitle("Distribution of Change in Transaction Count")
+```                   
+
+
+
+```{r Distribution of Average Card Utilization Ratio}
+#Histogram
+hist(churn.df$Avg_Utilization_Ratio,xlab = "Avg_Utilization_Ratio", freq = T,
+     ylab = "count",main = "Average Card Utilization Ratio Histogram",
+     col = "orange") 
+
+#Outliers
+#Box plot for outliers
+ggplot(churn.df) +
+  geom_boxplot(aes(x = "Avg_Utilization_Ratio", y = Avg_Utilization_Ratio), 
+               fill = "gold1", outlier.color = "firebrick2") +
+  xlab(" Avg_Utilization_Ratio") + ggtitle("Distribution of Average Card Utilization Ratio Variable")
+
+#Effect of Average card Utilization Ratio On customer churn
+ggplot(churn.df) +
+  geom_histogram(aes(x = Avg_Utilization_Ratio, color = Attrition_Flag), binwidth = 0.08, fill = "goldenrod2") +
+  ggtitle("Distribution of Average Card Utilization Ratio")
+```                   
+
+
+
+
+```{r correlation}
+# Number of transactions in the (last 12 months) vs Total transaction value (last 12 months)
+hc <- churn.df %>% 
+  hchart('scatter', hcaes(x = Total_Trans_Ct, y = Total_Trans_Amt, group = Attrition_Flag)) %>%
+  hc_colors(c("#00bb45", "#bb0070", "#d307fc")) %>%
+  hc_add_theme(hc_theme_smpl()) %>% 
+  hc_legend(align = "center") %>%
+  hc_title(text = "Total Transaction Count (Last 12 months) vs Total Transaction Amount (Last 12 months)", align = "center")%>%
+  hc_tooltip(formatter = JS("function(){
+                            return (' <br> Total transaction value (last 12 months): ' + this.y + ' <br> Total transaction count (last 12 months): ' + this.x)}"))
+
+hc
+```

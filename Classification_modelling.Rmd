@@ -1,0 +1,532 @@
+---
+title: "Project_3_update"
+author: "shantanu solanki"
+date: "July 27, 2021"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r libraries}
+# install.packages("gplots")
+# install.packages("highcharter")
+# install.packages("smotefamily")
+# install.packages("DMwR2")
+# install.packages("varImp")
+# install.packages("randomForest")
+# install.packages("vip")
+# install.packages("factoextra")
+# install.packages("MLmetrics")
+# install.packages("rpart")
+# install.packages("glmnet")
+library(DMwR2)
+library(pROC)
+library(glmnet)
+library(rpart)
+library(randomForest)
+library(MLmetrics)
+library(factoextra)
+library(vip)
+library(caret)
+library(randomForest)
+library(varImp)
+library(ROSE)
+library(smotefamily)
+library(highcharter)
+library(ggplot2)
+library(gplots)
+```
+
+**Reading and pre-processing data**
+```{r sumary}
+#Read Data
+BankChurners <- read.csv("BankChurners.csv")
+
+#Convert to Data.Frame
+BankChurn.df <- data.frame(BankChurners[-c(1,22,23)])
+str(BankChurn.df)
+
+#Check for missing values
+MissingData <- is.null(BankChurn.df)
+
+#Convert Variables from character to numeric
+BankChurn.df$Attrition_Flag <- ifelse(BankChurn.df$Attrition_Flag == "Existing Customer", 1, 0)
+BankChurn.df$Gender <- ifelse(BankChurn.df$Gender == "M", 1, 0)
+BankChurn.df$Education_Level <- as.numeric(factor(BankChurn.df$Education_Level,levels = unique(BankChurn.df$Education_Level)))
+BankChurn.df$Marital_Status <- as.numeric(factor(BankChurn.df$Marital_Status,levels = unique(BankChurn.df$Marital_Status)))
+BankChurn.df$Card_Category <- as.numeric(factor(BankChurn.df$Card_Category, levels = unique(BankChurn.df$Card_Category)))
+BankChurn.df$Income_Category <- as.numeric(factor(BankChurn.df$Income_Category, levels = unique(BankChurn.df$Income_Category)))
+
+head(BankChurn.df)
+ 
+#summary
+summary.data.frame(BankChurn.df)
+
+#Correlation and Heat Map
+BankChurn.df.cor <- cor(BankChurn.df); BankChurn.df.cor
+
+heatmap.2(BankChurn.df.cor,main = "BankChurn Correlation Heatmap", Rowv = FALSE, Colv = FALSE,
+          dendrogram ="none",cellnote = round(BankChurn.df.cor,2),
+          notecol = "black", key = FALSE, trace = 'none', margins = c(4,4))
+
+#visual of Highest Correlation
+ggplot(BankChurn.df, aes(x=Total_Trans_Amt, y=Total_Trans_Ct)) + 
+  geom_point()+
+  geom_smooth(method=lm)+
+  ggtitle("Total Trans Amt vs Total Trans Ct")
+
+ggplot(BankChurn.df, aes(x=Customer_Age, y=Months_on_book)) + 
+  geom_point()+
+  geom_smooth(method=lm)+
+  ggtitle("Customer Age vs Months on Book")
+
+#visual of Attrition vs Total Trans Ct
+ggplot(BankChurn.df, aes(x=Total_Trans_Ct, y=Attrition_Flag)) + 
+  geom_point()+
+  geom_smooth(method=lm)+
+  ggtitle("Attrition vs Total Trans Ct")
+```
+
+***Dropping correlated variable***
+```{r Handling correlation}
+BankChurn.df <- subset(BankChurn.df, select = -c(Avg_Open_To_Buy))
+```
+
+**Feature Importance**
+```{r Feature Importance}
+# Applying the Random Forest for feature importance on the entire dataset
+rf <- randomForest(Attrition_Flag ~ ., data=BankChurn.df, ntree=25,
+                          keep.forest=FALSE, importance=TRUE)
+importance(rf, type=1)
+varImpPlot(rf)
+```
+
+
+```{r Variable Importance}
+# Applying the VIP function for feature importance on the entire dataset
+vi.model <- train(Attrition_Flag ~ ., data = BankChurn.df,  method = 'glm', family = "binomial")
+vip(vi.model) 
+```
+
+**Balancing the unbalanced dataset**
+```{r SMOTE for balancing Attrition_Flag }
+
+table(BankChurn.df$Attrition_Flag)
+
+# using SMOTE to create a more balanced target
+smoteBankChurn.df<- SMOTE(BankChurn.df, BankChurn.df$Attrition_Flag, K = 5, dup_size = 4)
+smoteBankChurn.df <- smoteBankChurn.df$data
+smoteBankChurn.df <- subset(smoteBankChurn.df, select = -c(class))
+# smoteBankChurn.df$Attrition_Flag <- as.factor(ifelse(smoteBankChurn.df$Attrition_Flag == 1, 1, 0))
+
+table(smoteBankChurn.df$Attrition_Flag)
+```
+
+
+```{r BLSMOTE for balancing Attrition_Flag }
+
+table(BankChurn.df$Attrition_Flag)
+
+# using blsmote to create a more balanced target
+blsmoteBankChurn.df <- BLSMOTE(BankChurn.df, BankChurn.df$Attrition_Flag, K=5,C=5, dupSize=14,method =c("type1","type2"))
+blsmoteBankChurn.df <- blsmoteBankChurn.df$data
+blsmoteBankChurn.df <- subset(blsmoteBankChurn.df, select = -c(class))
+# blsmoteBankChurn.df$Attrition_Flag <- as.factor(ifelse(blsmoteBankChurn.df$Attrition_Flag == 1, 1, 0))
+
+table(blsmoteBankChurn.df$Attrition_Flag)
+```
+
+
+```{r over sampling}
+#over sampling for balancing the target in the dataset
+data_balanced_over <- ovun.sample(Attrition_Flag ~ ., data = BankChurn.df, method = "over",N = 17000)$data
+# data_balanced_over$Attrition_Flag <- as.factor(ifelse(data_balanced_over$Attrition_Flag == 1, 1, 0))
+
+table(data_balanced_over$Attrition_Flag)
+```
+
+
+```{r under sampling}
+# under sampling for balancing the target in the dataset
+data_balanced_under <- ovun.sample(Attrition_Flag ~ ., data = BankChurn.df, method = "under", N = 3254, seed = 1)$data
+# data_balanced_under$Attrition_Flag <- as.factor(ifelse(data_balanced_under$Attrition_Flag == 1, 1, 0))
+
+ table(data_balanced_under$Attrition_Flag)
+```
+
+**Principal Component Analysis**
+```{r PCA}
+actual.pca <- prcomp(BankChurn.df, scale = TRUE)
+fviz_pca_var(actual.pca,
+             col.var = "contrib", # Color by contributions to the PC
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+             repel = TRUE     # Avoid text overlapping
+             )
+fviz_eig(actual.pca)
+```
+
+**Data partition**
+```{r Create Data Partition for actual data}
+set.seed(123) 
+train.index <- createDataPartition(BankChurn.df$Attrition, p = 0.8, list = FALSE)
+actualtrain.df <-BankChurn.df[train.index, ]
+actualvalid.df <-BankChurn.df[-train.index, ]
+```
+
+
+```{r Create Data Partition for Over Sample Data Set}
+set.seed(123) 
+train.index <- createDataPartition(data_balanced_over$Attrition, p = 0.8, list = FALSE)
+overtrain.df <-data_balanced_over[train.index, ]
+overvalid.df <-data_balanced_over[-train.index, ]
+```
+
+
+```{r Create Data Partition for Under Sample Data Set}
+set.seed(123) 
+train.index <- createDataPartition(data_balanced_under$Attrition, p = 0.8, list = FALSE)
+undertrain.df <-data_balanced_under[train.index, ]
+undervalid.df <-data_balanced_under[-train.index, ]
+```
+
+
+```{r Create Data Partition for SMOTE data set}
+set.seed(123) 
+train.index <- createDataPartition(smoteBankChurn.df$Attrition, p = 0.8, list = FALSE)
+smotetrain.df <-smoteBankChurn.df[train.index, ]
+smotevalid.df <-smoteBankChurn.df[-train.index, ]
+```
+
+
+```{r Create Data Partition for blsmote data set}
+set.seed(123) 
+train.index <- createDataPartition(blsmoteBankChurn.df$Attrition, p = 0.8, list = FALSE)
+blsmotetrain.df <-blsmoteBankChurn.df[train.index, ]
+blsmotevalid.df <-blsmoteBankChurn.df[-train.index, ]
+```
+
+**Classification Models**
+
+***1.A Logistic Regression models on the different dataframes***
+```{r  logistic regression model on actual dataset}
+options(warn=-1)
+
+# Running Logistic Regression Including All The Variables Using 10-Fold-Cross-Validation on the actual dataset
+tr <- trainControl(method = "repeatedcv", 
+                          number = 10,repeats = 3,
+                          verboseIter = TRUE)
+logit.reg.unbalanced <- train(Attrition_Flag ~ ., data = actualtrain.df,  method = 'glm', family = "binomial",
+              trControl = tr) 
+
+options(scipen=999)
+summary(logit.reg.unbalanced)
+
+#Creating Confusion Matriix
+predicted.unbalanced.lr <- predict(logit.reg.unbalanced, actualvalid.df[, -1])
+
+predicted.factor.unbalanced.lr <- as.factor(ifelse(predicted.unbalanced.lr >= 0.5, 1,0))
+Attrition.factor <- as.factor(ifelse(actualvalid.df$Attrition_Flag == 1, 1, 0))
+result.logit.unbalanced <- confusionMatrix(predicted.factor.unbalanced.lr, Attrition.factor, positive="0")
+result.logit.unbalanced
+
+precision.logit.unbalanced <- result.logit.unbalanced$byClass[5]
+recall.logit.unbalanced <- result.logit.unbalanced$byClass[6]
+f1.logit.unbalanced <- result.logit.unbalanced$byClass[7]
+precision.logit.unbalanced
+recall.logit.unbalanced
+f1.logit.unbalanced
+```
+
+
+***1.B Logistic Regression On SMOTE Data***
+```{r  logistic regression model on SMOTE data set}
+options(warn=-1)
+
+# Running Logistic Regression on SMOTE Data Set using 10-Fold-Cross-Validation
+tr <- trainControl(method = "repeatedcv", 
+                          number = 10,repeats = 3,
+                          verboseIter = TRUE)
+logit.reg.smote <- train(Attrition_Flag ~ ., data = smotetrain.df,  method = 'glm', family = "binomial",
+              trControl = tr) 
+
+options(scipen=999)
+summary(logit.reg.smote)
+
+#Creating Confusion Matriix
+predicted.smote.lr <- predict(logit.reg.smote, smotevalid.df[, -1])
+
+predicted.factor.smote.lr <- as.factor(ifelse(predicted.smote.lr >= 0.5, 1,0))
+smot.Attrition.factor <- as.factor(ifelse(smotevalid.df$Attrition_Flag == 1, 1, 0))
+result.logit.smote <- confusionMatrix(predicted.factor.smote.lr, smot.Attrition.factor, positive="0")
+result.logit.smote 
+
+precision.logit.smote <- result.logit.smote$byClass[5]
+recall.logit.smote <- result.logit.smote$byClass[6]
+f1.logit.smote <- result.logit.smote$byClass[7]
+precision.logit.smote
+recall.logit.smote
+f1.logit.smote
+```
+
+Conclusion - Specificity improved on the SMOTE data set for the Logistic Regression Classification model indicating better performance of Logit function on the balanced dataset
+
+
+
+***1.C Logistic Regression On blsmote Data***
+```{r  logistic regression model on blsmote dataset}
+options(warn=-1)
+
+#Running Logistic Regression on blsmote Data Set using 10-Fold-Cross-Validation
+tr <- trainControl(method = "repeatedcv", 
+                          number = 10,repeats = 3,
+                          verboseIter = TRUE)
+logit.reg.blsmote <- train(Attrition_Flag ~ ., data = blsmotetrain.df,  method = 'glm', family = "binomial",
+              trControl = tr) 
+
+options(scipen=999)
+summary(logit.reg.blsmote)
+
+#Creating Confusion Matrix
+predicted.blsmote.lr <- predict(logit.reg.smote, blsmotevalid.df[, -1])
+
+predicted.factor.smote.lr <- as.factor(ifelse(predicted.blsmote.lr >= 0.5, 1,0))
+blsmote.Attrition.factor <- as.factor(ifelse(blsmotevalid.df$Attrition_Flag == 1, 1, 0))
+result.logit.blsmote <- confusionMatrix(predicted.factor.smote.lr, blsmote.Attrition.factor, positive="0")
+result.logit.blsmote 
+
+precision.logit.blsmote <- result.logit.blsmote$byClass[5]
+recall.logit.blsmote <- result.logit.blsmote$byClass[6]
+f1.logit.blsmote <- result.logit.blsmote$byClass[7]
+precision.logit.blsmote
+recall.logit.blsmote
+f1.logit.blsmote
+```
+Conclusion - Changing the method of balancing from SMOTE to BLSMOTE doesn't lead to any significant improvement in the model performance so we will proceed with the comparison of the model perfomance between the original data and the SMOTE balanced data.
+
+
+****1.D Logistic Regression On Under sampled data****
+```{r  logistic regression model on undersampled dataset}
+options(warn=-1)
+
+#Running Logistic Regression Including Under Sample Data Set using 10-Fold-Cross-Validation
+tr <- trainControl(method = "repeatedcv", 
+                          number = 10,repeats = 3,
+                          verboseIter = TRUE)
+logit.reg.under <- train(Attrition_Flag ~ ., data = undertrain.df,  method = 'glm', family = "binomial",
+              trControl = tr) 
+
+options(scipen=999)
+summary(logit.reg.under)
+
+#Creating Confusion Matriix
+predicted.under.lr <- predict(logit.reg.under, undervalid.df[, -1])
+
+predicted.factor.under.lr <- as.factor(ifelse(predicted.under.lr >= 0.5, 1,0))
+under.Attrition.factor <- as.factor(ifelse(undervalid.df$Attrition_Flag == 1, 1, 0))
+result.logit.under <- confusionMatrix(predicted.factor.under.lr, under.Attrition.factor, positive="0")
+result.logit.under 
+
+precision.logit.under<- result.logit.under$byClass[5]
+recall.logit.under <- result.logit.under$byClass[6]
+f1.logit.under <- result.logit.under$byClass[7]
+precision.logit.under
+recall.logit.under
+f1.logit.under
+```
+****The logistic regression model performs similar on the undersampled data. However, since the number of observations has been significantly reduced in the undersampled data, it might lead to over-fitting. Therefore, in order to build a robust model, we will avoid under-sampled data in the next steps.****
+
+***1.E Logistic Regression On over sampled data***
+```{r  logistic regression model on over sampled dataset}
+options(warn=-1)
+
+#Running Logistic Regression Including Over Sample Data Set using 10-Fold-Cross-Validation
+tr <- trainControl(method = "repeatedcv", 
+                          number = 10,repeats = 3,
+                          verboseIter = TRUE)
+logit.reg.over <- train(Attrition_Flag ~ ., data = overtrain.df,  method = 'glm', family = "binomial",
+              trControl = tr) 
+
+options(scipen=999)
+summary(logit.reg.over )
+
+#Creating Confusion Matriix
+predicted.over.lr <- predict(logit.reg.over, overvalid.df[, -1])
+
+predicted.factor.over.lr <- as.factor(ifelse(predicted.over.lr >= 0.5, 1,0))
+over.Attrition.factor <- as.factor(ifelse(overvalid.df$Attrition_Flag == 1, 1, 0))
+result.logit.over <- confusionMatrix(predicted.factor.over.lr, over.Attrition.factor, positive="0")
+result.logit.over 
+
+precision.logit.over<- result.logit.over$byClass[5]
+recall.logit.over <- result.logit.over$byClass[6]
+f1.logit.over <- result.logit.over$byClass[7]
+precision.logit.over
+recall.logit.over
+f1.logit.over
+```
+****The performance of Logistic regression model on the dataset balanced by SMOTE method is better compared to the dataset balanced by the oversampling method. Also, SMOTE method is better than oversampling which will induce bias in the dataset. Therefore, we will only consider the dataset balanced by the SMOTE method in the next steps.****
+
+
+***1.F Lasso Regularization on Logistic Regression***
+```{r Logistic Regression with Lasso Penalty}
+# Find the best lambda using cross-validation
+set.seed(123) 
+x_train_std <- as.matrix(smotetrain.df[,-1])
+
+cv.lasso <- cv.glmnet(x_train_std, smotetrain.df$Attrition_Flag, alpha = 1, family = "binomial")
+# Fit the final model on the training data
+model.lasso <- glmnet(smotetrain.df[,-1], smotetrain.df$Attrition_Flag, alpha = 1, family = "binomial",
+                lambda = cv.lasso$lambda.min)
+# Display regression coefficients
+coef(model.lasso)
+# Make predictions on the test data
+prediction.lasso <- model.matrix(Attrition_Flag ~., smotevalid.df)[,-1]
+probabilities <- model.lasso %>% predict(newx = prediction.lasso)
+predicted.classes <- ifelse(probabilities > 0.5, 1, 0)
+# Model accuracy
+observed.classes <- smotevalid.df$Attrition_Flag
+mean(predicted.classes == observed.classes)
+plot(cv.lasso)
+confusion_matrix_lasso <- table(smotevalid.df$Attrition_Flag, predicted.classes)
+confusion_matrix_lasso
+```
+
+
+***2.A Random Forest Classifier on the actual dataset*** 
+```{r Random Forest  On Actual sata set} 
+options(warn=-1)
+
+set.seed(123)
+bag.bankchurn.actual <- randomForest(Attrition_Flag~., data=actualtrain.df, ntree = 25,
+                          importance = TRUE)  # mtry: number of predictors
+bag.bankchurn.actual
+ 
+yhat.bag.actual <- predict(bag.bankchurn.actual, actualvalid.df[,-1])
+
+#Creating Confusion Matriix
+predicted.actual.rf <- predict(bag.bankchurn.actual ,  actualvalid.df[, -1])
+
+predicted.factor.actual.rf <- as.factor(ifelse(predicted.actual.rf >= 0.5, 1,0))
+actual.Attrition.factor <- as.factor(ifelse(actualvalid.df$Attrition_Flag == 1, 1, 0))
+result.rf.actual <- confusionMatrix(predicted.factor.actual.rf, actual.Attrition.factor, positive="0")
+result.rf.actual 
+
+precision.rf.actual<- result.rf.actual$byClass[5]
+recall.rf.actual <- result.rf.actual$byClass[6]
+f1.rf.actual <- result.rf.actual$byClass[7]
+precision.rf.actual
+recall.rf.actual
+f1.rf.actual
+```
+
+
+***2.B Random Forest Classifier on the SMOTE dataset*** 
+```{r Random Forest On SMOTE}
+options(warn=-1)
+
+set.seed(123)
+bag.bankchurn.smote <- randomForest(Attrition_Flag~., data=smotetrain.df, ntree = 25,
+                          importance = TRUE)  # mtry: number of predictors
+bag.bankchurn.smote
+
+#Creating Confusion Matriix
+predicted.smote.rf <- predict(bag.bankchurn.smote,smotevalid.df[, -1])
+
+predicted.factor.smote.rf <- as.factor(ifelse(predicted.smote.rf  >= 0.5, 1,0))
+smote.Attrition.factor <- as.factor(ifelse(smotevalid.df$Attrition_Flag == 1, 1, 0))
+result.rf.smote<- confusionMatrix(predicted.factor.smote.rf, smote.Attrition.factor , positive="0")
+result.rf.smote 
+
+precision.rf.smote <- result.rf.smote$byClass[5]
+recall.rf.smote  <- result.rf.smote$byClass[6]
+f1.rf.smote  <- result.rf.smote$byClass[7]
+precision.rf.smote
+recall.rf.smote
+f1.rf.smote 
+```
+***3.A Decision Tree Classifier on the actual dataset*** 
+```{r Decision tree on actual data}
+tree.actual <- rpart(Attrition_Flag ~., data = actualtrain.df)
+p.actual <- predict(tree.actual, actualvalid.df[,-1])
+predicted.factor.dt.actual <- as.factor(ifelse(p.actual >= 0.5, 1,0))
+dt.Attrition.factor.actual <- as.factor(ifelse(actualvalid.df$Attrition_Flag == 1, 1, 0))
+
+#Confusion matrix
+result.dt.actual <- confusionMatrix(predicted.factor.dt.actual, dt.Attrition.factor.actual, positive="0")
+result.dt.actual
+f1.dt.actual  <- result.dt.actual$byClass[7]
+f1.dt.actual
+```
+
+
+***3.B Decision Tree Classifier on the SMOTE dataset*** 
+```{r Decision tree on smote data}
+tree.smote <- rpart(Attrition_Flag ~., data = smotetrain.df)
+p.smote <- predict(tree.smote, smotevalid.df[,-1])
+predicted.factor.dt.smote <- as.factor(ifelse(p.smote  >= 0.5, 1,0))
+dt.Attrition.factor.smote <- as.factor(ifelse(smotevalid.df$Attrition_Flag == 1, 1, 0))
+
+#Confusion matrix
+result.dt.smote <- confusionMatrix(predicted.factor.dt.smote, dt.Attrition.factor.smote, positive="0")
+result.dt.smote
+f1.dt.smote  <- result.dt.smote$byClass[7]
+f1.dt.smote
+```
+
+
+
+
+**Comparison Of Classification Models**
+```{r comparison of best models on unbalanced (actual) dataset}
+# 1. Logistic Regression on unbalanced (actual) dataset
+predicted.smote.lr1 <- predict(logit.reg.smote, actualvalid.df[, -1])
+
+predicted.factor.smote.lr1 <- as.factor(ifelse(predicted.smote.lr1 >= 0.5, 1,0))
+actual.Attrition.factor <- as.factor(ifelse(actualvalid.df$Attrition_Flag == 1, 1, 0))
+result.logit1<- confusionMatrix(predicted.factor.smote.lr1, actual.Attrition.factor, positive = "0")
+result.logit1 
+
+f1.logit.smote1 <- result.logit1$byClass[7]
+f1.logit.smote1
+
+#ROC Curve
+R1 <- roc(actual.Attrition.factor, predicted.smote.lr1)
+plot.roc(R1)
+auc(R1)
+
+# 2. Random Forest on unbalanced (actual) dataset
+predicted.smote.rf2 <- predict(bag.bankchurn.smote,actualvalid.df[, -1])
+
+predicted.factor.smote.rf2 <- as.factor(ifelse(predicted.smote.rf2  >= 0.5, 1,0))
+result.rf.smote2 <- confusionMatrix(predicted.factor.smote.rf2, actual.Attrition.factor , positive = "0")
+result.rf.smote2 
+
+f1.rf.smote2  <- result.rf.smote2$byClass[7]
+f1.rf.smote2
+
+#ROC Curve
+R2 <- roc(actual.Attrition.factor, predicted.smote.rf2 )
+plot.roc(R2)
+auc(R2)
+
+# 3. Decision Tree on unbalanced (actual) dataset
+p.smote3 <- predict(tree.smote, actualvalid.df[,-1])
+predicted.factor.dt.smote3 <- as.factor(ifelse(p.smote3  >= 0.5, 1,0))
+
+result.dt.smote3 <- confusionMatrix(predicted.factor.dt.smote3, actual.Attrition.factor, positive="0")
+result.dt.smote3
+
+f1.dt.smote3  <- result.dt.smote3$byClass[7]
+f1.dt.smote3
+
+#ROC Curve
+R3 <- roc(actual.Attrition.factor, p.smote3 )
+plot.roc(R3)
+auc(R3)
+```
+
+From the comparison of the best Logistic Regression, Random Forest and Decision Tree, it can be observed the Random Forest trained on SMOTE dataset with all the variables provides the best result with an F-1 score of 0.9738059, Accuracy of  0.9916, Sensitivity of 0.9937 and Specificity of 0.9912 on the actual unbalanced dataset.
