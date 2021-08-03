@@ -1,5 +1,5 @@
 ---
-title: "project_2 update"
+title: "Exploratory_data_analysis"
 author: "shantanu solanki"
 date: "July 10, 2021"
 output:
